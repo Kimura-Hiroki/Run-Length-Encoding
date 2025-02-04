@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ランレングス圧縮デモ（動的ビット数対応版）</title>
+  <style>
+    /* 全体のスタイル */
+    body {
+      font-family: 'Arial', sans-serif;
+      background: #f0f4f8;
+      color: #333;
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    h1 {
+      margin-bottom: 20px;
+      color: #0056b3;
+    }
+    p.explanation {
+      text-align: center;
+      max-width: 600px;
+      line-height: 1.6;
+      margin-bottom: 20px;
+    }
+    /* グリッドのスタイル */
+    .grid-container {
+      display: grid;
+      grid-template-columns: repeat(8, 40px);
+      grid-template-rows: repeat(8, 40px);
+      gap: 2px;
+      margin-bottom: 20px;
+    }
+    .grid-cell {
+      width: 40px;
+      height: 40px;
+      background: white;
+      border: 1px solid #ccc;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+    .grid-cell.black {
+      background: #333;
+    }
+    /* ボタンのスタイル */
+    .button-container {
+      margin-bottom: 20px;
+    }
+    button {
+      background: #007BFF;
+      border: none;
+      padding: 10px 20px;
+      color: white;
+      font-size: 16px;
+      border-radius: 5px;
+      cursor: pointer;
+      margin: 0 10px;
+      transition: background 0.3s;
+    }
+    button:hover {
+      background: #0056b3;
+    }
+    /* 結果表示エリア */
+    .result-container {
+      max-width: 600px;
+      width: 100%;
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+    }
+    .result-section {
+      margin-bottom: 20px;
+    }
+    .result-section:last-child {
+      margin-bottom: 0;
+    }
+    .result-section h2 {
+      margin-bottom: 10px;
+      font-size: 18px;
+      border-bottom: 1px solid #ddd;
+      padding-bottom: 5px;
+      color: #007BFF;
+    }
+    .run-lengths {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin: 10px 0;
+    }
+    .run-length {
+      background: #e9ecef;
+      padding: 5px 10px;
+      border-radius: 5px;
+      font-size: 14px;
+    }
+    pre {
+      background: #f8f9fa;
+      padding: 10px;
+      border-radius: 5px;
+      overflow-x: auto;
+    }
+  </style>
+</head>
+<body>
+  <h1>ランレングス圧縮デモ</h1>
+  <p class="explanation">
+    以下の8×8のグリッドの各セルをクリックして、白と黒を切り替えながらパターンを作成してください。<br>
+    <strong>【圧縮する】</strong>ボタンを押すと、教科書の図式に沿って、<br>
+    ランレングス圧縮法によるデータの圧縮手順と、<br>
+    <strong>状況に応じた必要ビット数</strong>に基づく圧縮率が表示されます。
+  </p>
+  
+  <!-- 8×8のグリッド -->
+  <div class="grid-container" id="grid">
+    <!-- JavaScriptで64個のセルを自動生成 -->
+  </div>
+  
+  <!-- ボタン群 -->
+  <div class="button-container">
+    <button id="compressBtn">圧縮する</button>
+    <button id="resetBtn">リセット</button>
+  </div>
+  
+  <!-- 圧縮結果表示エリア -->
+  <div class="result-container" id="result">
+    <!-- 圧縮の計算過程がここに表示されます -->
+  </div>
+  
+  <script>
+    // 8×8のグリッドを生成
+    const gridContainer = document.getElementById('grid');
+    for (let i = 0; i < 64; i++) {
+      const cell = document.createElement('div');
+      cell.classList.add('grid-cell');
+      cell.dataset.index = i;
+      // セルをクリックすると白⇔黒が切り替わる
+      cell.addEventListener('click', function() {
+        cell.classList.toggle('black');
+      });
+      gridContainer.appendChild(cell);
+    }
+
+    // リセットボタン：全てのセルを白に戻し、結果表示をクリア
+    document.getElementById('resetBtn').addEventListener('click', function() {
+      document.querySelectorAll('.grid-cell').forEach(cell => {
+        cell.classList.remove('black');
+      });
+      document.getElementById('result').innerHTML = '';
+    });
+
+    // 圧縮ボタン：ランレングス圧縮の計算と表示
+    document.getElementById('compressBtn').addEventListener('click', function() {
+      // 1. グリッドの状態をビット列（0:白, 1:黒）として取得
+      const cells = document.querySelectorAll('.grid-cell');
+      let bitArray = [];
+      cells.forEach(cell => {
+        bitArray.push(cell.classList.contains('black') ? 1 : 0);
+      });
+
+      // オリジナルのビットマップデータ（8×8の行ごとに表示）
+      let originalDataHTML = '<p>各行のデータ（左上から順に）：</p><pre>';
+      for (let i = 0; i < 8; i++) {
+        originalDataHTML += bitArray.slice(i * 8, i * 8 + 8).join(' ') + "\n";
+      }
+      originalDataHTML += '</pre>';
+
+      // Step 1：元のビットマップデータ
+      let step1HTML = '<div class="result-section"><h2>Step 1: ビットマップデータ</h2>';
+      step1HTML += '<p>グリッドは <strong>8 × 8 = 64 ビット</strong> で構成されています。</p>';
+      step1HTML += originalDataHTML;
+      step1HTML += '</div>';
+
+      // Step 2：ランレングス圧縮の適用
+      let runs = [];
+      let currentBit = bitArray[0];
+      let count = 1;
+      for (let i = 1; i < bitArray.length; i++) {
+        if (bitArray[i] === currentBit) {
+          count++;
+        } else {
+          runs.push({ bit: currentBit, count: count });
+          currentBit = bitArray[i];
+          count = 1;
+        }
+      }
+      runs.push({ bit: currentBit, count: count });
+      
+      // ランレングスの数値列（色ごとの連続個数）
+      let runLengths = runs.map(run => run.count);
+      
+      let step2HTML = '<div class="result-section"><h2>Step 2: ランレングス圧縮の適用</h2>';
+      step2HTML += '<p>左上のセルの値は「' + (bitArray[0] === 0 ? '白 (0)' : '黒 (1)') + '」です。<br>';
+      step2HTML += '各セルの値が連続する個数を順に数えると、次のようになります。</p>';
+      step2HTML += '<div class="run-lengths">';
+      runs.forEach((run, index) => {
+        step2HTML += '<div class="run-length">' + (run.bit === 0 ? '白' : '黒') + '：' + run.count + '個</div>';
+      });
+      step2HTML += '</div>';
+      step2HTML += '<p>したがって、ランレングスの数値列は：<strong>' + runLengths.join(' ') + '</strong> となります。</p>';
+      step2HTML += '</div>';
+
+      // Step 3：圧縮後のデータ量と圧縮率の計算（必要なビット数は状況に応じて決定）
+      const numValues = runLengths.length;
+      // ランレングスの最大値を求め、その値を表すのに必要なビット数を計算
+      const maxRun = Math.max(...runLengths);
+      const bitsRequired = Math.ceil(Math.log2(maxRun + 1)); // **必要なビット数 = ceil(log₂(最大値 + 1))**
+      const compressedBits = numValues * bitsRequired;
+      const compressionRatio = Math.round((compressedBits / 64) * 100);
+      
+      let step3HTML = '<div class="result-section"><h2>Step 3: 圧縮後のデータ量と圧縮率</h2>';
+      step3HTML += '<p>ランレングス圧縮では、最初の色の情報と各連続個数を記録します。<br>';
+      step3HTML += '今回、得られた数値は <strong>' + runLengths.join(' ') + '</strong> で、<br>';
+      step3HTML += '最大値は <strong>' + maxRun + '</strong> です。</p>';
+      step3HTML += '<p>この最大値を表すのに必要なビット数は、<strong>ceil(log₂(' + (maxRun + 1) + ')) = ' + bitsRequired + ' ビット</strong> です。<br>';
+      step3HTML += 'よって、各数値は <strong>' + bitsRequired + ' ビット</strong> で表現でき、合計で <strong>' + numValues + ' × ' + bitsRequired + ' = ' + compressedBits + ' ビット</strong> となります。</p>';
+      step3HTML += '<p>圧縮率は、<strong>' + compressedBits + ' ÷ 64 × 100 ≒ ' + compressionRatio + '%</strong> です。</p>';
+      step3HTML += '<p>※この方法では、もとのデータに完全に復元することが可能です。</p>';
+      step3HTML += '</div>';
+
+      // すべての結果をまとめて表示
+      const resultHTML = step1HTML + step2HTML + step3HTML;
+      document.getElementById('result').innerHTML = resultHTML;
+    });
+  </script>
+</body>
+</html>
